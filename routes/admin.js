@@ -3,7 +3,6 @@ const { body, validationResult, query } = require('express-validator');
 const { Op } = require('sequelize');
 const bcrypt = require('bcryptjs');
 const sequelize = require('../config/database'); // <-- add this line
-
 const { 
   AdminUser, 
   Vendor, 
@@ -19,7 +18,6 @@ const {
 const { authenticateToken, authorize, verifyUserStatus } = require('../middleware/auth');
 
 const router = express.Router();
-
 // @route   GET /api/admin/dashboard
 // @desc    Get admin dashboard statistics
 // @access  Private (Admin only)
@@ -29,10 +27,7 @@ router.get('/dashboard', [
   verifyUserStatus
 ], async (req, res, next) => {
   try {
-    const limit = 5;
-    const offset = 0;
     const today = new Date();
-    const thirtyDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 
     // Get basic statistics
@@ -46,7 +41,7 @@ router.get('/dashboard', [
       monthlyBookings,
       monthlyRevenue,
       totalReviews,
-      averageRating
+      averageRatingResult
     ] = await Promise.all([
       User.count({ where: { status: 'active' } }),
       Vendor.count(),
@@ -67,98 +62,132 @@ router.get('/dashboard', [
         }
       }),
       Review.count(),
-      Review.findOne({
-        attributes: [[sequelize.fn('AVG', sequelize.col('rating')), 'avg_rating']]
-      })
+      sequelize.query(
+        'SELECT AVG(rating) as avg_rating FROM reviews',
+        { type: sequelize.QueryTypes.SELECT }
+      )
     ]);
 
-    // Get recent activity (last 10 activities)
-    const recentBookings = await Booking.findAll({
-      include: [
-        { model: User, attributes: ['name'] },
-        { model: Vendor, attributes: ['shop_name'] }
-      ],
-      order: [['created_at', 'DESC']],
-      limit: 5,
-      attributes: ['booking_id', 'booking_status', 'total_amount', 'created_at']
-    });
+    const averagePlatformRating = averageRatingResult[0]?.avg_rating || 0;
 
-    const recentVendorRegistrations = await Vendor.findAll({
-      where: { verification_status: 'pending' },
-      order: [['created_at', 'DESC']],
-      limit: 5,
-      attributes: ['vendor_id', 'owner_name', 'shop_name', 'city', 'created_at']
-    });
+    // Get recent bookings with raw query to avoid aliasing issues
+    const recentBookingsRaw = await sequelize.query(`
+      SELECT 
+        b.booking_id,
+        b.booking_status,
+        b.total_amount,
+        b.created_at,
+        u.name as user_name,
+        v.shop_name as vendor_shop_name
+      FROM bookings b
+      LEFT JOIN users u ON b.user_id = u.user_id
+      LEFT JOIN vendors v ON b.vendor_id = v.vendor_id
+      ORDER BY b.created_at DESC
+      LIMIT 5
+    `, { type: sequelize.QueryTypes.SELECT });
+
+    // Get recent vendor registrations
+    const recentVendorRegistrationsRaw = await sequelize.query(`
+      SELECT 
+        vendor_id,
+        owner_name,
+        shop_name,
+        city,
+        created_at
+      FROM vendors
+      WHERE verification_status = 'pending'
+      ORDER BY created_at DESC
+      LIMIT 5
+    `, { type: sequelize.QueryTypes.SELECT });
 
     // Monthly trends (last 6 months)
-    const monthlyStats = await Promise.all([
-      // Bookings trend
-      sequelize.query(`
-        SELECT 
-          DATE_TRUNC('month', created_at) as month,
-          COUNT(*) as booking_count,
-          SUM(CASE WHEN booking_status = 'completed' THEN total_amount ELSE 0 END) as revenue
-        FROM bookings 
-        WHERE created_at >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '5 months')
-        GROUP BY DATE_TRUNC('month', created_at)
-        ORDER BY month
-      `, { type: sequelize.QueryTypes.SELECT }),
-      
-      // User registration trend
-      sequelize.query(`
-        SELECT 
-          DATE_TRUNC('month', created_at) as month,
-          COUNT(*) as user_count
-        FROM users 
-        WHERE created_at >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '5 months')
-        GROUP BY DATE_TRUNC('month', created_at)
-        ORDER BY month
-      `, { type: sequelize.QueryTypes.SELECT })
-    ]);
+    const bookingTrends = await sequelize.query(`
+      SELECT 
+        DATE_TRUNC('month', created_at) as month,
+        COUNT(*) as booking_count,
+        SUM(CASE WHEN booking_status = 'completed' THEN total_amount ELSE 0 END) as revenue
+      FROM bookings 
+      WHERE created_at >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '5 months')
+      GROUP BY DATE_TRUNC('month', created_at)
+      ORDER BY month
+    `, { type: sequelize.QueryTypes.SELECT });
 
     // Top performing vendors
-    const topVendors = await Vendor.findAll({
-      include: [
-        {
-          model: Booking,
-          where: { booking_status: 'completed' },
-          required: false
-        },
-        {
-          model: Review,
-          required: false
-        }
-      ],
-      where: { verification_status: 'approved', status: 'active' },
-      attributes: [
-        'vendor_id',
-        'shop_name',
-        'city',
-        // [sequelize.fn('COUNT', sequelize.col('Bookings.booking_id')), 'total_bookings'],
-        // [sequelize.fn('COUNT', sequelize.col('Reviews.review_id')), 'total_reviews']
-      ],
-      group: ['User.user_id'],
-      order: [['created_at', 'DESC']],
-      limit: parseInt(limit),
-      offset
-    });
+    const topVendors = await sequelize.query(`
+      SELECT 
+        v.vendor_id,
+        v.shop_name,
+        v.city,
+        COUNT(DISTINCT b.booking_id) as total_bookings,
+        COALESCE(SUM(CASE WHEN b.booking_status = 'completed' THEN b.total_amount END), 0) as total_revenue,
+        COALESCE(AVG(r.rating), 0) as avg_rating
+      FROM vendors v
+      LEFT JOIN bookings b ON v.vendor_id = b.vendor_id
+      LEFT JOIN reviews r ON v.vendor_id = r.vendor_id
+      WHERE v.verification_status = 'approved' AND v.status = 'active'
+      GROUP BY v.vendor_id, v.shop_name, v.city
+      ORDER BY total_revenue DESC
+      LIMIT 5
+    `, { type: sequelize.QueryTypes.SELECT });
 
     res.json({
       success: true,
       data: {
-        users,
-        pagination: {
-          current_page: parseInt(page),
-          total_pages: Math.ceil(count / parseInt(limit)),
-          total_count: count,
-          per_page: parseInt(limit)
-        }
+        stats: {
+          totalUsers,
+          totalVendors,
+          activeVendors,
+          pendingApprovals,
+          totalBookings,
+          completedBookings,
+          monthlyBookings,
+          monthlyRevenue: parseFloat(monthlyRevenue || 0),
+          totalReviews,
+          averagePlatformRating: parseFloat(averagePlatformRating || 0)
+        },
+        recentActivity: {
+          recentBookings: recentBookingsRaw.map(booking => ({
+            bookingId: booking.booking_id,
+            bookingStatus: booking.booking_status,
+            totalAmount: booking.total_amount.toString(),
+            createdAt: booking.created_at,
+            user: { name: booking.user_name || 'N/A' },
+            vendor: { shopName: booking.vendor_shop_name || 'N/A' }
+          })),
+          recentVendorRegistrations: recentVendorRegistrationsRaw.map(vendor => ({
+            vendorId: vendor.vendor_id,
+            ownerName: vendor.owner_name,
+            shopName: vendor.shop_name,
+            city: vendor.city,
+            createdAt: vendor.created_at
+          }))
+        },
+        trends: {
+          monthlyStats: bookingTrends.map(trend => ({
+            month: trend.month,
+            bookingCount: trend.booking_count.toString(),
+            revenue: trend.revenue.toString()
+          }))
+        },
+        topVendors: topVendors.map(vendor => ({
+          vendorId: vendor.vendor_id,
+          shopName: vendor.shop_name,
+          city: vendor.city,
+          totalBookings: vendor.total_bookings.toString(),
+          totalRevenue: vendor.total_revenue.toString(),
+          avgRating: parseFloat(vendor.avg_rating || 0).toFixed(1)
+        }))
       }
     });
   } catch (error) {
-    next(error);
+    console.error('Dashboard error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Internal server error'
+    });
   }
 });
+
 
 // @route   GET /api/admin/bookings
 // @desc    Get all bookings with filtering
@@ -701,6 +730,128 @@ router.get('/vendors/pending', [
     });
   } catch (error) {
     next(error);
+  }
+});
+// @route   GET /api/admin/platform-stats
+// @desc    Get platform statistics
+// @access  Private (Admin only)
+router.get('/platform-stats', [
+  authenticateToken,
+  authorize('admin'),
+  verifyUserStatus
+], async (req, res, next) => {
+  try {
+    const today = new Date();
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+
+    const [
+      totalUsers,
+      newUsersThisMonth,
+      activeUsers,
+      totalVendors,
+      approvedVendors,
+      pendingVendors,
+      rejectedVendors,
+      totalBookings,
+      completedBookings,
+      cancelledBookings,
+      monthlyBookings,
+      totalRevenue,
+      monthlyRevenue,
+      lastMonthRevenue,
+      totalReviews,
+      avgRatingResult,
+      totalServices,
+      activeServices
+    ] = await Promise.all([
+      User.count(),
+      User.count({ where: { created_at: { [Op.gte]: startOfMonth } } }),
+      User.count({ where: { status: 'active' } }),
+      Vendor.count(),
+      Vendor.count({ where: { verification_status: 'approved' } }),
+      Vendor.count({ where: { verification_status: 'pending' } }),
+      Vendor.count({ where: { verification_status: 'rejected' } }),
+      Booking.count(),
+      Booking.count({ where: { booking_status: 'completed' } }),
+      Booking.count({ where: { booking_status: 'cancelled' } }),
+      Booking.count({ where: { created_at: { [Op.gte]: startOfMonth } } }),
+      Booking.sum('total_amount', { where: { booking_status: 'completed' } }),
+      Booking.sum('total_amount', { 
+        where: { 
+          booking_status: 'completed',
+          created_at: { [Op.gte]: startOfMonth }
+        }
+      }),
+      Booking.sum('total_amount', { 
+        where: { 
+          booking_status: 'completed',
+          created_at: { [Op.gte]: lastMonth, [Op.lt]: startOfMonth }
+        }
+      }),
+      Review.count(),
+      sequelize.query('SELECT AVG(rating) as avg_rating FROM reviews', { 
+        type: sequelize.QueryTypes.SELECT 
+      }),
+      ServicesMaster.count(),
+      ServicesMaster.count({ where: { status: 'active' } })
+    ]);
+
+    const averageRating = avgRatingResult[0]?.avg_rating || 0;
+    const approvalRate = totalVendors > 0 
+      ? ((approvedVendors / totalVendors) * 100).toFixed(2) 
+      : '0.00';
+    const completionRate = totalBookings > 0 
+      ? ((completedBookings / totalBookings) * 100).toFixed(2) 
+      : '0.00';
+    const growthPercentage = lastMonthRevenue > 0 
+      ? (((monthlyRevenue - lastMonthRevenue) / lastMonthRevenue) * 100).toFixed(2) 
+      : '0.00';
+
+    res.json({
+      success: true,
+      data: {
+        users: {
+          total: totalUsers,
+          newThisMonth: newUsersThisMonth,
+          active: activeUsers
+        },
+        vendors: {
+          total: totalVendors,
+          approved: approvedVendors,
+          pending: pendingVendors,
+          rejected: rejectedVendors,
+          approvalRate: `${approvalRate}%`
+        },
+        bookings: {
+          total: totalBookings,
+          completed: completedBookings,
+          cancelled: cancelledBookings,
+          thisMonth: monthlyBookings,
+          completionRate: `${completionRate}%`
+        },
+        revenue: {
+          total: parseFloat(totalRevenue || 0),
+          thisMonth: parseFloat(monthlyRevenue || 0),
+          lastMonth: parseFloat(lastMonthRevenue || 0),
+          growthPercentage: `${growthPercentage}%`
+        },
+        reviews: {
+          total: totalReviews,
+          averageRating: parseFloat(averageRating || 0)
+        },
+        services: {
+          total: totalServices,
+          active: activeServices
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Platform stats error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Internal server error'
+    });
   }
 });
 
