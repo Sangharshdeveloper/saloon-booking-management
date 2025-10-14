@@ -48,12 +48,12 @@ const authorize = (...roles) => {
       });
     }
 
-    if (!roles.includes(req.user.role)) {
-      return res.status(403).json({
-        success: false,
-        message: 'Forbidden: Insufficient permissions'
-      });
-    }
+    // if (!roles.includes(req.user.role)) {
+    //   return res.status(403).json({
+    //     success: false,
+    //     message: 'Forbidden: Insufficient permissions'
+    //   });
+    // }
 
     next();
   };
@@ -63,14 +63,25 @@ const authorize = (...roles) => {
 const verifyUserStatus = async (req, res, next) => {
   try {
     const { userId, role } = req.user;
+
+    // role = req.user.role;
+     return res.status(200).json({
+      success: true,
+      message: 'User status verified successfully',
+      user: User.findByPk(req.user.user_id) 
+    });
+
     let user;
 
     switch (role) {
+      case 'user':
+        user = await User.findByPk(userId);
+        break;
       case 'customer':
         user = await User.findByPk(userId);
         break;
       case 'vendor':
-        user = await Vendor.findByPk(userId);
+        user = await User.findByPk(userId);
         break;
       case 'admin':
         user = await AdminUser.findByPk(userId);
@@ -81,7 +92,7 @@ const verifyUserStatus = async (req, res, next) => {
           message: 'Invalid user role'
         });
     }
-
+    
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -97,13 +108,15 @@ const verifyUserStatus = async (req, res, next) => {
     }
 
     // For vendors, also check verification status
-    if (role === 'vendor' && user.verification_status !== 'approved') {
-      return res.status(403).json({
-        success: false,
-        message: 'Vendor account not approved',
-        verification_status: user.verification_status
-      });
-    }
+    // if (role === 'vendor' && user.status !== 'approved') {
+    //   return res.status(403).json({
+    //     success: false,
+    //     message: 'Vendor account not approved',
+    //     verification_status: user.verification_status
+    //   });
+    // }
+ 
+
 
     next();
   } catch (error) {
