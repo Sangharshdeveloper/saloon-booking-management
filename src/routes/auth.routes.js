@@ -1,8 +1,6 @@
-// routes/authRoutes.js - Updated Routes for Unified User Structure
-
 const express = require('express');
 const router = express.Router();
-const authController = require('../controllers/authController');
+const authController = require('../controllers/auth.controller');
 const { authenticate, authorizeVendor } = require('../middleware/authMiddleware');
 
 // ============================================

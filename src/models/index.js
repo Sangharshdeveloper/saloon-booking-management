@@ -1,6 +1,6 @@
 // models/index.js - Refactored for Unified User Structure
 const { DataTypes } = require('sequelize');
-const { Sequelize } = require('sequelize');
+const { Sequelize, Op } = require('sequelize');
 const sequelize = require('../config/database');
 
 const db = {};
