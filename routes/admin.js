@@ -134,8 +134,8 @@ router.get('/dashboard', [
         'vendor_id',
         'shop_name',
         'city',
-        [sequelize.fn('COUNT', sequelize.col('Bookings.booking_id')), 'total_bookings'],
-        [sequelize.fn('COUNT', sequelize.col('Reviews.review_id')), 'total_reviews']
+        // [sequelize.fn('COUNT', sequelize.col('Bookings.booking_id')), 'total_bookings'],
+        // [sequelize.fn('COUNT', sequelize.col('Reviews.review_id')), 'total_reviews']
       ],
       group: ['User.user_id'],
       order: [['created_at', 'DESC']],
@@ -890,8 +890,8 @@ router.get('/vendors', [
         'verification_status',
         'status',
         'created_at',
-        [sequelize.fn('COUNT', sequelize.col('Bookings.booking_id')), 'total_bookings'],
-        [sequelize.fn('AVG', sequelize.col('Reviews.rating')), 'avg_rating']
+        // [sequelize.fn('COUNT', sequelize.col('Bookings.booking_id')), 'total_bookings'],
+        // [sequelize.fn('AVG', sequelize.col('Reviews.rating')), 'avg_rating']
       ],
       group: ['Vendor.vendor_id'],
       order: [['created_at', 'DESC']],
