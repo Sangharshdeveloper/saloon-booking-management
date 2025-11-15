@@ -3,6 +3,8 @@ const { body, validationResult, query } = require('express-validator');
 const { Op } = require('sequelize');
 const bcrypt = require('bcryptjs');
 const sequelize = require('../config/database'); // <-- add this line
+const vendorsController = require('../controllers/vendors.controller');
+const adminController = require('../controllers/admin.controller');
 const { 
   AdminUser, 
   Vendor, 
@@ -969,103 +971,106 @@ router.put('/vendors/:vendor_id/reject', [
 // @route   GET /api/admin/vendors
 // @desc    Get all vendors with filtering
 // @access  Private (Admin only)
-router.get('/vendors', [
-  authenticateToken,
-  authorize('admin'),
-  verifyUserStatus,
-  query('page').optional().isInt({ min: 1 }).withMessage('Valid page number required'),
-  query('limit').optional().isInt({ min: 1, max: 50 }).withMessage('Valid limit required'),
-  query('verification_status').optional().isIn(['pending', 'approved', 'rejected']).withMessage('Valid verification status required'),
-  query('city').optional().isLength({ min: 2 }).withMessage('Valid city required'),
-  query('search').optional().isLength({ min: 2 }).withMessage('Search term must be at least 2 characters')
-], async (req, res, next) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation failed',
-        errors: errors.array()
-      });
-    }
+router.get('/vendors',adminController.getVendorsList);
+router.get('/users',adminController.getUsersList);
+ 
+// router.get('/vendors', [
+//   authenticateToken,
+//   authorize('admin'),
+//   verifyUserStatus,
+//   query('page').optional().isInt({ min: 1 }).withMessage('Valid page number required'),
+//   query('limit').optional().isInt({ min: 1, max: 50 }).withMessage('Valid limit required'),
+//   query('verification_status').optional().isIn(['pending', 'approved', 'rejected']).withMessage('Valid verification status required'),
+//   query('city').optional().isLength({ min: 2 }).withMessage('Valid city required'),
+//   query('search').optional().isLength({ min: 2 }).withMessage('Search term must be at least 2 characters')
+// ], async (req, res, next) => {
+//   try {
+//     const errors = validationResult(req);
+//     if (!errors.isEmpty()) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Validation failed',
+//         errors: errors.array()
+//       });
+//     }
 
-    const {
-      page = 1,
-      limit = 10,
-      verification_status,
-      city,
-      search
-    } = req.query;
+//     const {
+//       page = 1,
+//       limit = 10,
+//       verification_status,
+//       city,
+//       search
+//     } = req.query;
 
-    const offset = (parseInt(page) - 1) * parseInt(limit);
+//     const offset = (parseInt(page) - 1) * parseInt(limit);
 
-    // Build where conditions
-    let whereConditions = {};
+//     // Build where conditions
+//     let whereConditions = {};
 
-    if (verification_status) {
-      whereConditions.verification_status = verification_status;
-    }
+//     if (verification_status) {
+//       whereConditions.verification_status = verification_status;
+//     }
 
-    if (city) {
-      whereConditions.city = { [Op.iLike]: `%${city}%` };
-    }
+//     if (city) {
+//       whereConditions.city = { [Op.iLike]: `%${city}%` };
+//     }
 
-    if (search) {
-      whereConditions[Op.or] = [
-        { shop_name: { [Op.iLike]: `%${search}%` } },
-        { owner_name: { [Op.iLike]: `%${search}%` } },
-        { shop_address: { [Op.iLike]: `%${search}%` } }
-      ];
-    }
+//     if (search) {
+//       whereConditions[Op.or] = [
+//         { shop_name: { [Op.iLike]: `%${search}%` } },
+//         { owner_name: { [Op.iLike]: `%${search}%` } },
+//         { shop_address: { [Op.iLike]: `%${search}%` } }
+//       ];
+//     }
 
-    const { count, rows: vendors } = await Vendor.findAndCountAll({
-      where: whereConditions,
-      include: [
-        {
-          model: Booking,
-          required: false,
-          where: { booking_status: 'completed' }
-        },
-        {
-          model: Review,
-          required: false
-        }
-      ],
-      attributes: [
-        'vendor_id',
-        'owner_name',
-        'phone_number',
-        'shop_name',
-        'city',
-        'state',
-        'verification_status',
-        'status',
-        'created_at',
-        // [sequelize.fn('COUNT', sequelize.col('Bookings.booking_id')), 'total_bookings'],
-        // [sequelize.fn('AVG', sequelize.col('Reviews.rating')), 'avg_rating']
-      ],
-      group: ['Vendor.vendor_id'],
-      order: [['created_at', 'DESC']],
-      limit: parseInt(limit),
-      offset
-    });
+//     const { count, rows: vendors } = await Vendor.findAndCountAll({
+//       where: whereConditions,
+//       include: [
+//         {
+//           model: Booking,
+//           required: false,
+//           where: { booking_status: 'completed' }
+//         },
+//         {
+//           model: Review,
+//           required: false
+//         }
+//       ],
+//       attributes: [
+//         'vendor_id',
+//         'owner_name',
+//         'phone_number',
+//         'shop_name',
+//         'city',
+//         'state',
+//         'verification_status',
+//         'status',
+//         'created_at',
+//         // [sequelize.fn('COUNT', sequelize.col('Bookings.booking_id')), 'total_bookings'],
+//         // [sequelize.fn('AVG', sequelize.col('Reviews.rating')), 'avg_rating']
+//       ],
+//       group: ['Vendor.vendor_id'],
+//       order: [['created_at', 'DESC']],
+//       limit: parseInt(limit),
+//       offset
+//     });
 
-    res.json({
-      success: true,
-      data: {
-        vendors,
-        pagination: {
-          current_page: parseInt(page),
-          total_pages: Math.ceil(count / parseInt(limit)),
-          total_count: count,
-          per_page: parseInt(limit)
-        }
-      }
-    });
-  } catch (error) {
-    next(error);
-  }
-});
+//     res.json({
+//       success: true,
+//       data: {
+//         vendors,
+//         pagination: {
+//           current_page: parseInt(page),
+//           total_pages: Math.ceil(count / parseInt(limit)),
+//           total_count: count,
+//           per_page: parseInt(limit)
+//         }
+//       }
+//     });
+//   } catch (error) {
+//     next(error);
+//   }
+// });
 
 // @route   PUT /api/admin/vendors/:vendor_id/deactivate
 // @desc    Deactivate vendor account

@@ -1,6 +1,6 @@
 const { Sequelize,Op } = require('sequelize');
 const { 
-  Vendor, 
+  Vendor,
   VendorService, 
   VendorImage, 
   ServicesMaster, 
@@ -790,6 +790,13 @@ class VendordataService {
       affected_count: affectedCount,
       updated_fields: Object.keys(filteredUpdates)
     };
+  }
+
+  async getVendorsList() {
+    const vendors = await User.findAll({
+      where: { user_type: 'vendor' },
+    });
+    return vendors;
   }
 }
 

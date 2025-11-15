@@ -341,6 +341,8 @@ class VendorsController {
       next(error);
     }
   }
+
+
 }
 
 module.exports = new VendorsController();
