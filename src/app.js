@@ -34,6 +34,7 @@ const userRoutes = require('./routes/user.routes');
 const vendorRoutes = require('./routes/vendor.routes');
 const bookingRoutes = require('./routes/booking.routes');
 const serviceRoutes = require('./routes/service.routes');
+
 // const reviewRoutes = require('./routes/review.routes');
 
 // Mount routes

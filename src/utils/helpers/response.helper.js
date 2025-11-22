@@ -1,33 +1,28 @@
 // src/utils/helpers/response.helper.js
 
 /**
- * Send success response
+ * Send success response (Standard)
  * @param {Object} res - Express response object
- * @param {string} message - Success message
  * @param {*} data - Response data
- * @param {number} statusCode - HTTP status code (default: 200)
+ * @param {string} message - Success message
+ * @param {number} status - HTTP status code
  */
-const successResponse = (res, message, data = null, statusCode = 200) => {
-  const response = {
+function sendSuccessResponse(res, data = null, message = "Success", status = 200) {
+  return res.status(status).json({
     success: true,
-    message
-  };
-
-  if (data !== null) {
-    response.data = data;
-  }
-
-  return res.status(statusCode).json(response);
-};
+    message,
+    data
+  });
+}
 
 /**
- * Send error response
+ * Send error response (Standard)
  * @param {Object} res - Express response object
  * @param {string} message - Error message
- * @param {number} statusCode - HTTP status code (default: 400)
- * @param {*} errors - Validation errors or additional details
+ * @param {number} status - HTTP status code
+ * @param {*} errors - Detailed validation errors (optional)
  */
-const errorResponse = (res, message, statusCode = 400, errors = null) => {
+function sendErrorResponse(res, message = "Error", status = 400, errors = null) {
   const response = {
     success: false,
     message
@@ -37,27 +32,28 @@ const errorResponse = (res, message, statusCode = 400, errors = null) => {
     response.errors = errors;
   }
 
-  return res.status(statusCode).json(response);
-};
+  return res.status(status).json(response);
+}
 
 /**
  * Send paginated response
  * @param {Object} res - Express response object
- * @param {string} message - Success message
- * @param {Array} data - Data array
+ * @param {*} data - Data array
  * @param {Object} pagination - Pagination metadata
+ * @param {string} message - Message text
  */
-const paginatedResponse = (res, message, data, pagination) => {
+function sendPaginatedResponse(res, data, pagination, message = "Success") {
   return res.status(200).json({
     success: true,
     message,
     data,
     pagination
   });
-};
+}
 
+// Export unified helpers only
 module.exports = {
-  successResponse,
-  errorResponse,
-  paginatedResponse
+  sendSuccessResponse,
+  sendErrorResponse,
+  sendPaginatedResponse
 };

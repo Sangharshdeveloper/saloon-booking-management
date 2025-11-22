@@ -17,7 +17,7 @@ router.post('/register/vendor', authController.registerVendor);
 router.post('/login', authController.login);
 
 // Admin login
-router.post('/admin/login', authController.adminLogin);
+router.post('/admin-login', authController.adminLogin);
 
 // ============================================
 // PROTECTED ROUTES (Authentication required)

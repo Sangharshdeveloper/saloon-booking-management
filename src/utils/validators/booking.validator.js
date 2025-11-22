@@ -34,9 +34,9 @@ const bookingValidators = {
       .matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/)
       .withMessage('Valid start time required (HH:MM format)'),
     
-    body('payment_method')
-      .isIn(Object.values(PAYMENT_METHOD))
-      .withMessage(`Payment method must be one of: ${Object.values(PAYMENT_METHOD).join(', ')}`),
+    // body('payment_method')
+    //   .isIn(Object.values(PAYMENT_METHOD))
+    //   .withMessage(`Payment method must be one of: ${Object.values(PAYMENT_METHOD).join(', ')}`),
     
     body('notes')
       .optional()
@@ -71,9 +71,9 @@ const bookingValidators = {
       .isMobilePhone()
       .withMessage('Valid phone number required'),
     
-    body('payment_method')
-      .isIn(Object.values(PAYMENT_METHOD))
-      .withMessage(`Payment method must be one of: ${Object.values(PAYMENT_METHOD).join(', ')}`),
+    // body('payment_method')
+    //   .isIn(Object.values(PAYMENT_METHOD))
+    //   .withMessage(`Payment method must be one of: ${Object.values(PAYMENT_METHOD).join(', ')}`),
     
     body('booking_type')
       .isIn([BOOKING_TYPE.OFFLINE, BOOKING_TYPE.WALK_IN])

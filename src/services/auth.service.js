@@ -25,9 +25,9 @@ class AuthService {
    * @param {string} role 
    * @returns {string} The JWT token
    */
-  _generateToken(user_id, user_type, role) {
+  _generateToken(user_id, user_type) {
     return jwt.sign(
-      { user_id, user_type, role },
+      { user_id, user_type },
       process.env.JWT_SECRET || 'your-secret-key-please-change-me',
       { expiresIn: '30d' }
     );
@@ -280,14 +280,13 @@ class AuthService {
     await user.update({ last_login_at: new Date() });
 
     // Generate JWT token
-    const token = this._generateToken(user.user_id, 'admin', user.role);
+    const token = this._generateToken(user.user_id, 'admin');
 
     return {
       admin: {
         user_id: user.user_id,
         name: user.name,
         email: user.email,
-        role: user.role,
         user_type: user.user_type
       },
       token

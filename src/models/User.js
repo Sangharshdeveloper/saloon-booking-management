@@ -1,5 +1,3 @@
-// models/User.js - Unified User Model
-
 const { DataTypes } = require('sequelize');
 const Sequelize = require('sequelize');
 
@@ -37,11 +35,7 @@ module.exports = (sequelize) => {
       allowNull: false,
       defaultValue: 'customer'
     },
-    role: {
-      type: DataTypes.ENUM('user', 'admin', 'super_admin', 'manager','vendor'),
-      allowNull: true,
-      defaultValue: 'vendor'
-    },
+  
     city: {
       type: DataTypes.STRING(50),
       allowNull: true
@@ -59,16 +53,8 @@ module.exports = (sequelize) => {
       allowNull: true
     },
     status: {
-      type: DataTypes.ENUM('active', 'inactive', 'suspended', 'deleted'),
+      type: DataTypes.ENUM('active', 'inactive', 'suspended'),
       defaultValue: 'active'
-    },
-    is_verified: {
-      type: DataTypes.BOOLEAN,
-      defaultValue: false
-    },
-    email_verified: {
-      type: DataTypes.BOOLEAN,
-      defaultValue: false
     },
     phone_verified: {
       type: DataTypes.BOOLEAN,
@@ -93,18 +79,13 @@ module.exports = (sequelize) => {
     updated_at: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW
-    },
-    deleted_at: {
-      type: DataTypes.DATE,
-      allowNull: true
     }
   }, {
     tableName: 'users',
     timestamps: true,
-    paranoid: true,
+    paranoid: false,
     createdAt: 'created_at',
     updatedAt: 'updated_at',
-    deletedAt: 'deleted_at',
     indexes: [
       { fields: ['phone_number'] },
       { fields: ['email'] },
@@ -120,48 +101,6 @@ module.exports = (sequelize) => {
       foreignKey: 'user_id',
       as: 'vendorShop'
     });
-
-    // Bookings as customer
-    // User.hasMany(models.Booking, {
-    //   foreignKey: 'user_id',
-    //   as: 'customerBookings'
-    // });
-
-    // Bookings as vendor
-    // User.hasMany(models.Booking, {
-    //   foreignKey: 'vendor_id',
-    //   as: 'vendorBookings'
-    // });
-
-    // Reviews as customer
-    // User.hasMany(models.Review, {
-    //   foreignKey: 'user_id',
-    //   as: 'givenReviews'
-    // });
-
-    // Reviews as vendor
-    // User.hasMany(models.Review, {
-    //   foreignKey: 'vendor_id',
-    //   as: 'receivedReviews'
-    // });
-
-    // Notifications as customer
-    // User.hasMany(models.Notification, {
-    //   foreignKey: 'user_id',
-    //   as: 'customerNotifications'
-    // });
-
-    // Notifications as vendor
-    // User.hasMany(models.Notification, {
-    //   foreignKey: 'vendor_id',
-    //   as: 'vendorNotifications'
-    // });
-
-    // Vendor services
-    // User.hasMany(models.VendorService, {
-    //   foreignKey: 'vendor_id',
-    //   as: 'services'
-    // });
 
     // Vendor images
     User.hasMany(models.VendorImage, {
